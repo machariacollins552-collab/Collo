@@ -4,7 +4,7 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../data/meals.dart';
 import '../models/chat_message.dart';
-import '../models/saved_plan.dart';
+import '../models/user_profile.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/formatted_text.dart';
