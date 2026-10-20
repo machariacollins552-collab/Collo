@@ -6,7 +6,7 @@ import '../core/theme.dart';
 import '../data/insights.dart';
 import '../data/quick_prompts.dart';
 import '../data/workouts.dart';
-import '../models/habit_day.dart';
+import '../models/user_profile.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/log_weight_sheet.dart';
