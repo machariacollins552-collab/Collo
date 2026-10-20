@@ -1,0 +1,39 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+pubspec.lock
+*.iml
+.idea/
+.vscode/
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# Backend (Cloudflare Worker)
+backend/node_modules/
+backend/.wrangler/
+backend/.dev.vars
+.dev.vars
+
+# Secrets: never commit these
+.env
+.env.*
+*.pem
+
+# OS files
+.DS_Store
+Thumbs.db

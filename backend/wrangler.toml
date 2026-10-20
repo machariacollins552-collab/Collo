@@ -1,0 +1,13 @@
+# Cloudflare Worker configuration for the FitCoach AI backend.
+# Secrets (GEMINI_API_KEY, optional APP_TOKEN) are NOT stored here - see README.
+name = "collins-fit-ai-coach"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# Google Gemini model used for chat. Change it here if Google retires this name.
+GEMINI_MODEL = "gemini-3.8-flash"
+
+[observability]
+enabled = false

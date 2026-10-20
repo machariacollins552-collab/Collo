@@ -1,0 +1,13 @@
+{
+  "name": "collins-fit-ai-coach",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FitCoach AI backend for Collins Fit AI (Cloudflare Worker, Gemini).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

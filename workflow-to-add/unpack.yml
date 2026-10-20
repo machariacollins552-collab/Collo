@@ -1,0 +1,33 @@
+name: Unpack project zip
+
+# Run this once, from the Actions tab, after uploading collins-fit-ai-source.zip
+# to the main page of the repository. It unpacks the project and commits the files.
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Unpack the zip and commit the files
+        run: |
+          set -e
+          if [ ! -f collins-fit-ai-source.zip ]; then
+            echo "::error::Upload collins-fit-ai-source.zip to the main page of this repository first."
+            exit 1
+          fi
+          unzip -q collins-fit-ai-source.zip -d /tmp/unpacked
+          top=$(ls -d /tmp/unpacked/*/ | head -n 1)
+          cp -a "${top}." .
+          git rm -q --cached collins-fit-ai-source.zip
+          rm collins-fit-ai-source.zip
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Collins Fit AI project files"
+          git push

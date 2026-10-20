@@ -1,0 +1,147 @@
+name: Build Android APK
+
+# Runs on every push to the main branch, and whenever you press "Run workflow"
+# on the Actions tab of your repository.
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - 'backend/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+# Lets the last step publish the APK as a GitHub Release (a direct .apk download).
+permissions:
+  contents: write
+
+# If you push twice quickly, only the newest build keeps running.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # "3.47.x" means: the newest 3.47 release. The Android build files in this project
+      # (Gradle 9.3.1, Android Gradle Plugin 9.1.0, Kotlin 2.4.0) match this Flutter line.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.x
+          cache: true
+
+      - name: Show tool versions
+        run: |
+          flutter --version
+          java -version
+
+      - name: Get packages
+        run: flutter pub get
+
+      # Errors (code that cannot compile) stop the build. Style hints and warnings are
+      # printed in the log but do not stop it, so a tiny hint never blocks your APK.
+      - name: Analyze the code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run the tests
+        run: flutter test
+
+      # OPTIONAL: your own permanent signing key. Only used when you added the four
+      # KEYSTORE_* secrets described in the README. Without them, the debug key is used.
+      - name: Prepare your signing key (optional)
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+            echo "custom=true" >> "$GITHUB_OUTPUT"
+            echo "Using your own signing key."
+          else
+            echo "custom=false" >> "$GITHUB_OUTPUT"
+            echo "No signing secrets found. Using the debug key (fine for installing on your own phone)."
+          fi
+
+      # Every GitHub machine starts empty, so without this each build would get a brand-new
+      # debug key and Android would refuse to install a new build over the old one.
+      # Keeping the key in the cache makes updates install normally.
+      - name: Keep the same debug key between builds
+        if: steps.signing.outputs.custom == 'false'
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: collins-fit-ai-debug-keystore-v1
+
+      - name: Build the release APK
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::warning::The BACKEND_URL repository variable is not set. The app will ask for the AI server address on first use (Profile > AI connection)."
+          fi
+          flutter build apk --release \
+            --dart-define=BACKEND_URL="$BACKEND_URL" \
+            --dart-define=APP_TOKEN="$APP_TOKEN"
+
+      - name: Check the APK exists
+        run: |
+          ls -lh build/app/outputs/flutter-apk/
+          test -s build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Name the APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk collins-fit-ai.apk
+
+      # Download from the run page (it arrives inside a .zip file).
+      - name: Upload the APK as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: collins-fit-ai-apk
+          path: collins-fit-ai.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Easier on a phone: a plain .apk on the Releases page, no unzipping needed.
+      - name: Publish to the "latest" release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short="${GITHUB_SHA::7}"
+          notes="Built from commit ${short}. Debug-signed unless you added your own signing key. Install on Android by opening this file."
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --target "$GITHUB_SHA" --prerelease \
+              --title "Collins Fit AI - latest build" --notes "$notes"
+          else
+            gh release edit latest --notes "$notes"
+          fi
+          gh release upload latest collins-fit-ai.apk --clobber
+
+      - name: Summary
+        run: |
+          {
+            echo "### Collins Fit AI APK built"
+            echo ""
+            echo "- Artifact: **collins-fit-ai-apk** (below, inside a .zip)"
+            echo "- Direct download: open the repository's **Releases** page and tap **collins-fit-ai.apk**"
+            echo "- Signed with: $([ '${{ steps.signing.outputs.custom }}' = 'true' ] && echo 'your own key' || echo 'the debug key')"
+          } >> "$GITHUB_STEP_SUMMARY"
